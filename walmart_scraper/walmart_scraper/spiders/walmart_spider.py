@@ -57,8 +57,9 @@ class WalmartSpider(scrapy.Spider):
             return cate_requests
         else:
             product_requests = []
-            for product in self.products:
-                request = scrapy.Request('https://www.walmart.com'+product.category_id, 
+            category_ids = set([product.category_id for product in self.products])
+            for category_url in category_ids:
+                request = scrapy.Request('https://www.walmart.com'+category_url, 
                                          callback=self.parse)
                 # request.meta['category'] = product.category_id
                 product_requests.append(request)
@@ -108,7 +109,10 @@ class WalmartSpider(scrapy.Spider):
                     yield request
         elif products:
             for product in products:
-                url = 'https://www.walmart.com' + product['productPageUrl']
+                if not product.get('productPageUrl'):
+                    continue
+
+                url = 'https://www.walmart.com' + product.get('productPageUrl', '')
                 url = url.split('?')[0]
                 if (self.task.mode == 1 and not url in self.excludes) or (self.task.mode == 2 and url in self.excludes):
                     category = response.url.split('?')[0][23:]
@@ -161,7 +165,7 @@ class WalmartSpider(scrapy.Spider):
             offset = response.meta.get('offset', 1)
             total_records = response.meta.get('total_records', content["preso"]["requestContext"]["itemCount"]["total"])
             
-            if offset * 40 < total_records:
+            if offset * 40 < total_records and offset < 25:
                 offset += 1 # page
                 base_url = response.url.split('?')[0]
                 next_url = base_url+'?page={}'.format(offset)
