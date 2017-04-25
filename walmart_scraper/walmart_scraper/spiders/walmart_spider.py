@@ -43,6 +43,7 @@ class WalmartSpider(scrapy.Spider):
                 self.excludes = get_category_products(self.categories[0])
         elif self.task.mode == 2:
             self.products = Product.objects.filter(id__in=get_ids(self.task.products))
+            self.excludes = [item.url for item in self.products]
 
     def start_requests(self):    
         if self.task.mode == 1:
@@ -57,9 +58,9 @@ class WalmartSpider(scrapy.Spider):
         else:
             product_requests = []
             for product in self.products:
-                request = scrapy.Request(product.url, 
-                                         callback=self.detail)
-                request.meta['category'] = product.category_id
+                request = scrapy.Request('https://www.walmart.com'+product.category_id, 
+                                         callback=self.parse)
+                # request.meta['category'] = product.category_id
                 product_requests.append(request)
             return product_requests    
 
@@ -109,40 +110,53 @@ class WalmartSpider(scrapy.Spider):
             for product in products:
                 url = 'https://www.walmart.com' + product['productPageUrl']
                 url = url.split('?')[0]
-                if not detail in self.excludes:
+                if (self.task.mode == 1 and not url in self.excludes) or (self.task.mode == 2 and url in self.excludes):
                     category = response.url.split('?')[0][23:]
                     promo = ''
+                    price = ''
+                    special = ''
+                    delivery_time = ''
+
+                    if product['primaryOffer'].get('offerPrice'):
+                        price = '${}'.format(product['primaryOffer']['offerPrice'])
+                    elif product['primaryOffer'].get('minPrice'):
+                        price = '${} - ${}'.format(product['primaryOffer']['minPrice'], product['primaryOffer']['maxPrice'])
+
+                    special = product.get('specialOfferText', '')
                     if 'listPrice' in product['primaryOffer']:
-                        promo = product['primaryOffer']['currencyCode'] + product['primaryOffer']['listPrice']
+                        promo = '$' + str(product['primaryOffer']['listPrice'])
                     if 's2HDisplayFlags' in product['fulfillment']:
                         promo += '\n' + '\n'.join(product['fulfillment']['s2HDisplayFlags'])
                     if 's2SDisplayFlags' in product['fulfillment']:
                         promo += '\n' + '\n'.join(product['fulfillment']['s2SDisplayFlags'])
-
-                    item = {
-                        'id': product['usItemId'],
-                        'title': product['title'],
-                        'price': product['primaryOffer']['currencyCode'] + product['primaryOffer']['offerPrice'],
-                        'picture': product['imageUrl'],
-                        'rating': product['customerRating'],
-                        'review_count': product['numReviews'],
-                        'promo': promo,
-                        'category_id': category,
-                        'delivery_time': 'Zip Code specific',
-                        'bullet_points': '\n'.join(response.css('span[itemprop=description] li::text').extract()),
-                        'details': product['description'].replace('<li>', '').replace('</li>', '\n'),
-                        'quantity': product['quantity'],
-                        'min_quantity': 1,
-                        'special': ,
-                        'url': url
-                    }        
+                    if product.get('twoDayShippingEligible', ''):
+                        delivery_time = '2-Day Shipping'
 
                     try:
+                        item = {
+                            'id': product['usItemId'],
+                            'title': product['title'],
+                            'price': price,
+                            'picture': product['imageUrl'],
+                            'rating': product.get('customerRating', 0),
+                            'review_count': product.get('numReviews', 0),
+                            'promo': promo,
+                            'category_id': category,
+                            'delivery_time': delivery_time,
+                            'bullet_points': '',
+                            'details': product.get('description', '').replace('<li>', '').replace('</li>', '\n'),
+                            'quantity': product.get('quantity', 0),
+                            'min_quantity': 1,
+                            'special': special,
+                            'url': url
+                        }    
+
                         Product.objects.update_or_create(id=item['id'], defaults=item)
+                        yield item    
                     except Exception, e:
                         print str(e), '@@@@@@@@@@@@@@@@'
+                        print product
 
-                    yield item    
             # for other pages / pagination
             offset = response.meta.get('offset', 1)
             total_records = response.meta.get('total_records', content["preso"]["requestContext"]["itemCount"]["total"])
