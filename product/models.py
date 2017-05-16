@@ -10,7 +10,7 @@ from django.core.validators import MinValueValidator
 class Product(models.Model):
     id = models.IntegerField(primary_key=True)
     title = models.CharField(max_length=250)
-    price = models.CharField(max_length=10)
+    price = models.CharField(max_length=20)
     picture = models.CharField(max_length=250)
     rating = models.FloatField()
     review_count = models.IntegerField()
@@ -31,8 +31,8 @@ class Product(models.Model):
 
 
 class Category(models.Model):    
-    url = models.CharField(max_length=100, primary_key=True)
-    title = models.CharField(max_length=100)
+    url = models.CharField(max_length=240, primary_key=True)
+    title = models.CharField(max_length=240)
     parent = models.ForeignKey('Category', null=True)
 
     def __unicode__(self):
