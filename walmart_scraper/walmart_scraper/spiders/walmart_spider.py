@@ -49,9 +49,10 @@ class WalmartSpider(scrapy.Spider):
         if self.task.mode == 1:
             cate_requests = []
             for item in self.categories:
-                request = scrapy.Request('https://www.walmart.com'+item,
-                                          callback=self.parse)
-                request.meta['category'] = item
+                url = 'https://www.walmart.com'+item
+                url = add_param(url, '__category__', item)
+                request = scrapy.Request(url, callback=self.parse)
+                # request.meta['category'] = item
                 # request.meta['proxy'] = 'http://'+random.choice(self.proxy_pool)
                 cate_requests.append(request)
             return cate_requests
@@ -63,7 +64,7 @@ class WalmartSpider(scrapy.Spider):
                                          callback=self.parse)
                 # request.meta['category'] = product.category_id
                 product_requests.append(request)
-            return product_requests    
+            return product_requests
 
     def closed(self, reason):
         self.update_run_time()
@@ -97,16 +98,18 @@ class WalmartSpider(scrapy.Spider):
             print str(e), '###########'
 
         if cates_url:
-            parent = response.meta['category']
+            # parent = response.meta['category']
+            parent = get_param(response.url, '__category__')
             for item in zip(cates_url, cates_title):
                 url = item[0].split('?')[0]
-                if not Category.objects.filter(url=url):
-                    Category.objects.create(parent_id=parent, url=url, title=item[1])
+                category_ = { 'parent_id': parent, 'url': url, 'title': item[1] }
 
-                    request = scrapy.Request('https://www.walmart.com'+url, callback=self.parse)
-                    request.meta['category'] = url
-                    # request.meta['proxy'] = 'http://'+random.choice(self.proxy_pool)
-                    yield request
+                Category.objects.update_or_create(url=url, defaults=category_)
+                url = add_param('https://www.walmart.com'+url, '__category__', url) 
+                request = scrapy.Request(url, callback=self.parse)
+                # request.meta['category'] = url
+                # request.meta['proxy'] = 'http://'+random.choice(self.proxy_pool)
+                yield request
         elif products:
             for product in products:
                 if not product.get('productPageUrl'):
@@ -162,16 +165,20 @@ class WalmartSpider(scrapy.Spider):
                         print product
 
             # for other pages / pagination
-            offset = response.meta.get('offset', 1)
-            total_records = response.meta.get('total_records', content["preso"]["requestContext"]["itemCount"]["total"])
+            # offset = response.meta.get('offset', 1)
+            # total_records = response.meta.get('total_records', content["preso"]["requestContext"]["itemCount"]["total"])
+            offset = int(get_param(response.url, '__offset__') or 1)
+            total_records = int(get_param(response.url, '__total_records__') or content["preso"]["requestContext"]["itemCount"]["total"])
             
             if offset * 40 < total_records and offset < 25:
                 offset += 1 # page
                 base_url = response.url.split('?')[0]
                 next_url = base_url+'?page={}'.format(offset)
+                next_url = add_param(next_url, '__offset__', offset)
+                next_url = add_param(next_url, '__total_records__', total_records)
                 request = scrapy.Request(next_url, callback=self.parse)
-                request.meta['offset'] = offset
-                request.meta['total_records'] = total_records
+                # request.meta['offset'] = offset
+                # request.meta['total_records'] = total_records
                 yield request    
 
     def update_run_time(self):
@@ -200,3 +207,12 @@ class WalmartSpider(scrapy.Spider):
     def stop_scrapy(self):
         st = ScrapyTask.objects.filter(id=self.task.id).first()
         return not st or st.status == 3
+
+def add_param(url, key, val):
+    con = '&' if '?' in url else '?'
+    return '{}{}{}={}'.format(url, con, key, val)
+
+def get_param(url, key):
+    if not key in url:
+        return ''
+    return url.split(key+'=')[1].split('&')[0]
