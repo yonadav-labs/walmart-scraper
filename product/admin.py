@@ -11,7 +11,7 @@ from .views import *
 class ProductAdmin(admin.ModelAdmin):
     list_display = ['id', 'title', 'price', 'quantity', 'min_quantity', 
                     'rating', 'review_count', 'updated_at', 'url']
-    search_fields = ['title', 'bullet_points']
+    search_fields = ['id', 'title', 'bullet_points']
     actions = ['export_products']
     list_filter = ('category',)
 

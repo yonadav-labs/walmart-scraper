@@ -19,7 +19,8 @@
 
 #### Edit crontab entry
 	* * * * * python /root/paultitov-walmart/cron_task.py
-
+	*/30 * * * * sudo sync & sysctl -w vm.drop_caches=3
+	
 #### Create an export directory    
     mkdir /home/exports
     

@@ -49,7 +49,9 @@ class WalmartSpider(scrapy.Spider):
         if self.task.mode == 1:
             cate_requests = []
             for item in self.categories:
-                url = 'https://www.walmart.com'+item
+                url = item
+                if not 'http' in item:
+                    url = 'https://www.walmart.com'+item
                 url = add_param(url, '__category__', item)
                 request = scrapy.Request(url, callback=self.parse)
                 # request.meta['category'] = item
@@ -60,8 +62,10 @@ class WalmartSpider(scrapy.Spider):
             product_requests = []
             category_ids = set([product.category_id for product in self.products])
             for category_url in category_ids:
-                request = scrapy.Request('https://www.walmart.com'+category_url, 
-                                         callback=self.parse)
+                url = category_url
+                if not 'http' in item:
+                    url = 'https://www.walmart.com' + category_url
+                request = scrapy.Request(url, callback=self.parse)
                 # request.meta['category'] = product.category_id
                 product_requests.append(request)
             return product_requests
@@ -103,7 +107,7 @@ class WalmartSpider(scrapy.Spider):
             for item in zip(cates_url, cates_title):
                 url = item[0].split('?')[0]
                 category_ = { 'parent_id': parent, 'url': url, 'title': item[1] }
-
+                url = '/' +url.strip('https://www.walmart.com')
                 Category.objects.update_or_create(url=url, defaults=category_)
                 url = add_param('https://www.walmart.com'+url, '__category__', url) 
                 request = scrapy.Request(url, callback=self.parse)
