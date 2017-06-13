@@ -63,7 +63,7 @@ class WalmartSpider(scrapy.Spider):
             category_ids = set([product.category_id for product in self.products])
             for category_url in category_ids:
                 url = category_url
-                if not 'http' in item:
+                if not 'http' in url:
                     url = 'https://www.walmart.com' + category_url
                 request = scrapy.Request(url, callback=self.parse)
                 # request.meta['category'] = product.category_id
