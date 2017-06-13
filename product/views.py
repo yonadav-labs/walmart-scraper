@@ -332,4 +332,4 @@ def set_old_category_products(category):
 
 def get_ids(list_str):
     ids = list_str.replace('\n', ',')
-    return [int(item) for item in ids.split(',') if item]
+    return [item.strip() for item in ids.split(',') if item.strip()]
